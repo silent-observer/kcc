@@ -3,8 +3,9 @@ import ../src/kcc
 
 suite "Just compile":
   template compileFile(name: string) =
-    compile("tests" / "c" / "compile" / name & ".c", 
-            "tests" / "kasm" / "compile" / name & ".kasm", false)
+    if not compile("tests" / "c" / "compile" / name & ".c", 
+            "tests" / "kasm" / "compile" / name & ".kasm", false):
+      fail()
   test "funcTest":
     compileFile("funcTest")
   test "stringTest":
@@ -20,7 +21,8 @@ suite "Compile, link and run":
     let opt = {poStdErrToStdOut, poUsePath}
     discard execProcess("rm", args = [kasmName, objName, elfName, memName], options = opt)
 
-    compile(cName, kasmName, false)
+    if not compile(cName, kasmName, false):
+      fail()
     discard execProcess("kasm", args = [kasmName], options = opt)
     discard execProcess("mv", args = [kasmName.changeFileExt(".obj"), objName], options = opt)
     discard execProcess("kld", args = [objName], options = opt)

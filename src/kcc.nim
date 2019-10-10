@@ -5,7 +5,7 @@ import os, parseopt
 
 const Optimize = true
 
-proc compile*(input: string, output: string, print: bool = true) =
+proc compile*(input: string, output: string, print: bool = true): bool =
   let content = input.readFile()
   try:
     let tokens = content.lex()
@@ -52,6 +52,7 @@ proc compile*(input: string, output: string, print: bool = true) =
       echo code
     
     output.writeFile(code)
+    return true
   except LexingError as e:
     echo e[].reportError(content)
   except ParsingError as e:
@@ -64,6 +65,7 @@ proc compile*(input: string, output: string, print: bool = true) =
     echo e[].reportError(content)
   except GenerationError as e:
     echo e[].reportError(content)
+  return false
 
 when isMainModule:
   var inputs: seq[string]
@@ -86,14 +88,14 @@ when isMainModule:
     quit(1)
   elif inputs.len == 1:
     if output == "":
-      compile(inputs[0], inputs[0].changeFileExt(".kasm"))
+      discard compile(inputs[0], inputs[0].changeFileExt(".kasm"))
     else:
-      compile(inputs[0], output)
+      discard compile(inputs[0], output)
   else:
     if output != "":
       echo "Syntax: kcc <input.c> [-o <output.kasm>]"
       quit(1)
     else:
       for input in inputs:
-        compile(input, input.changeFileExt(".kasm"))
+        discard compile(input, input.changeFileExt(".kasm"))
   
