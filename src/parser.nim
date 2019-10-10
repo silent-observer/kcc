@@ -63,7 +63,7 @@ proc parseSymbol(parser: var Parser, symbol: string, errorMsg: string) =
 
 proc isType(t: Token): bool {.inline.} =
   if t.kind == Keyword:
-    return t.keyword in {Int, Short, Char, Unsigned, Signed, Struct};
+    return t.keyword in {Int, Short, Char, Unsigned, Signed, Struct, Void};
   return false;
 
 proc parseExpression(parser: var Parser): ExpressionNode
@@ -107,6 +107,9 @@ proc parseSimpleType(parser: var Parser): TypeData =
   if t.kind == Keyword:
     if t.keyword == Struct:
       return parser.parseStructType()
+    if t.keyword == Void:
+      parser.advance()
+      return TypeData(kind: VoidType)
     
     var 
       typeSigned = false 
@@ -464,7 +467,10 @@ proc parseLocalVarDecl(parser: var Parser): VarDeclNode {.inline.} =
 proc parseReturnStat(parser: var Parser): ReturnStatNode =
   result = parser.initNode(ReturnStatNode)
   parser.advance()
-  result.exp = parser.parseExpression()
+  if parser.peek().checkSymbol(";"):
+    result.exp = none(ExpressionNode)
+  else:
+    result.exp = parser.parseExpression().some()
   parser.parseSymbol(";", "Expected semicolon!")
 proc parseIfStat(parser: var Parser): IfStatNode =
   result = parser.initNode(IfStatNode)

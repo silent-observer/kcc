@@ -208,6 +208,7 @@ proc generatePointer(ast: ConvertExprNode, g: var Generator, target: Register) =
   let t = ast.exp.typeData
   case t.kind:
     of UnknownType: assert(false, "Convert from unknown type!")
+    of VoidType: assert(false, "Convert from void type!")
     of FunctionType: assert(false, "Convert from function type!")
     of StructType: assert(false, "Convert from struct type!")
     of PointerType: discard

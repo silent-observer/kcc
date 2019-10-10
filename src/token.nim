@@ -4,7 +4,7 @@ from strutils import escape
 const 
   Keywords* = [
     "break", "continue", "char", "do", "else", 
-    "for", "if", "int", "return", "short", "signed", "struct", "unsigned", "while"
+    "for", "if", "int", "return", "short", "signed", "struct", "unsigned", "void", "while"
     ]
 type
   KeywordKind* {.pure.} = enum
@@ -21,6 +21,7 @@ type
     Signed
     Struct
     Unsigned
+    Void
     While
 
 type

@@ -1,5 +1,5 @@
 int f(char a, unsigned short b);
-short g(int c);
+void g(int c);
 
 char h() {
     return 1;

@@ -10,6 +10,7 @@ type
     ArrayOfUnknownSizeType
     FunctionType
     StructType
+    VoidType
   SimpleTypeKind* {.pure.} = enum
     Int32
     Int16
@@ -26,6 +27,7 @@ type
     case kind*: TypeNodeKind:
       of UnknownType: nil
       of SimpleType: simpleType*: SimpleTypeKind
+      of VoidType: nil
       of PointerType: ptrType*: ref TypeData
       of ArrayType, ArrayOfUnknownSizeType: 
         elemType*: ref TypeData
@@ -50,6 +52,7 @@ type
   DeclaratorTypeData* = object
     case kind*: TypeNodeKind:
       of UnknownType: nil
+      of VoidType: nil
       of SimpleType: simpleType*: SimpleTypeKind
       of PointerType: ptrType*: ref DeclaratorTypeData
       of ArrayType, ArrayOfUnknownSizeType: 
@@ -85,7 +88,7 @@ type
   BreakStatNode* = ref object of StatementNode
   ContinueStatNode* = ref object of StatementNode
   ReturnStatNode* = ref object of StatementNode
-    exp*: ExpressionNode
+    exp*: Option[ExpressionNode]
   IfStatNode* = ref object of StatementNode
     cond*: ExpressionNode
     thenClause*: StatementNode
@@ -170,7 +173,8 @@ iterator mexps*(n: AstNode): var ExpressionNode =
       yield n.VarDeclNode.init.get()
   
   elif n of ReturnStatNode:
-    yield n.ReturnStatNode.exp
+    if n.ReturnStatNode.exp.isSome():
+      yield n.ReturnStatNode.exp.get()
   elif n of IfStatNode:
     yield n.IfStatNode.cond
   elif n of WhileStatNode:
@@ -262,6 +266,7 @@ proc `$`*(n: AstNode): string {.inline, locks: 0.}
 proc toString(t: TypeData, showStructDefs: bool): string {.locks: 0.} =
   result = (case t.kind:
     of UnknownType: "<unknown type>"
+    of VoidType: "void"
     of PointerType: "ptr to " & t.ptrType[].toString(showStructDefs)
     of ArrayType: 
       "array[" & $t.elemCount & "] of " & t.elemType[].toString(showStructDefs)
@@ -297,6 +302,7 @@ converter toDeclType*(t: TypeData): DeclaratorTypeData =
   result = DeclaratorTypeData(kind: t.kind)
   case t.kind:
     of UnknownType: discard
+    of VoidType: discard
     of PointerType: 
       new(result.ptrType)
       result.ptrType[] = t.ptrType[].toDeclType
@@ -321,6 +327,7 @@ converter toType*(t: DeclaratorTypeData): TypeData =
   result = TypeData(kind: t.kind)
   case t.kind:
     of UnknownType: discard
+    of VoidType: discard
     of PointerType: 
       new(result.ptrType)
       result.ptrType[] = t.ptrType[].toType
@@ -371,7 +378,11 @@ method toString(n: BreakStatNode, level: int): string =
 method toString(n: ContinueStatNode, level: int): string =
   spaces(level * SpacesInLevel) & "ContinueStatNode\p"
 method toString(n: ReturnStatNode, level: int): string =
-  spaces(level * SpacesInLevel) & "ReturnStatNode:\p" & n.exp.toString(level + 1)
+  result = spaces(level * SpacesInLevel) & "ReturnStatNode"
+  if n.exp.isSome():
+    result &= ":\p" & n.exp.get().toString(level + 1)
+  else:
+    result &= "\p"
 method toString(n: IfStatNode, level: int): string =
   result = spaces(level * SpacesInLevel) & "IfStatNode:\p"
   result &= spaces((level+1) * SpacesInLevel) & "Condition:\p" & n.cond.toString(level + 2)
@@ -499,6 +510,7 @@ proc getAlign*(t: TypeData): int {.locks: 0.} =
   case t.kind:
     of UnknownType: assert(false); 0
     of FunctionType: assert(false); 0
+    of VoidType: 1
     of PointerType: 4
     of ArrayType, ArrayOfUnknownSizeType: max(4, t.elemType[].getAlign)
     of StructType: t.structAdditional.align
@@ -513,6 +525,7 @@ proc getSize*(t: TypeData): int {.locks: 0.} =
     of UnknownType: assert(false); 0
     of FunctionType: assert(false); 0
     of ArrayOfUnknownSizeType: assert(false); 0
+    of VoidType: 1
     of PointerType: 4
     of ArrayType:
       t.elemType[].getAlignedSize * t.elemCount

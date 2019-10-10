@@ -222,7 +222,8 @@ method generate(ast: FuncDeclNode, g: var Generator) =
   g.output &= "\p"
 
 method generate(ast: ReturnStatNode, g: var Generator) =
-  ast.exp.generate(g, Register(1))
+  if ast.exp.isSome():
+    ast.exp.get().generate(g, Register(1))
   if g.currentFunc.maxStack != 0:
     g.output &= &"  ADDI SP, {g.currentFunc.maxStack}\p"
   g.output &= "  ADDI SP, FP, 4\p" &

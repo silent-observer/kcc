@@ -161,6 +161,9 @@ macro defineChooseByType*(defs: untyped): untyped =
         ident("UnknownType"), parseStmt("assert(false, \"Unknown type at " & assertFuncName & "\")" & elseAddition)
       ),
       nnkOfBranch.newTree(
+        ident("VoidType"), parseStmt("assert(false, \"Void type at " & assertFuncName & "\")" & elseAddition)
+      ),
+      nnkOfBranch.newTree(
         ident("FunctionType"), parseStmt("assert(false, \"Function type at " & assertFuncName & "\")" & elseAddition)
       ),
       nnkOfBranch.newTree(

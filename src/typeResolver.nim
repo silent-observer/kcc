@@ -69,10 +69,12 @@ proc areCompatible*(a, b: TypeData): bool {.locks: 0.} =
     let isAArray = a.kind in [ArrayType, ArrayOfUnknownSizeType]
     let isBArray = b.kind in [ArrayType, ArrayOfUnknownSizeType]
     return isAArray and isBArray and areCompatible(a.elemType[], b.elemType[])
+  if a.kind == VoidType or b.kind == VoidType: return true
   
   if a.kind != b.kind: return false
   case a.kind:
     of UnknownType: return false
+    of VoidType: return true
     of PointerType: return areCompatible(a.ptrType[], b.ptrType[])
     of ArrayType: return a.elemCount == b.elemCount and areCompatible(a.elemType[], b.elemType[])
     of ArrayOfUnknownSizeType: return false
@@ -158,6 +160,7 @@ proc checkIncomplete(t: TypeData, ast: AstNode) {.locks: 0.} =
   case t.kind:
     of UnknownType: ast.raiseError("Unknown type!")
     of SimpleType: return
+    of VoidType: return
     of PointerType: t.ptrType[].checkIncomplete(ast)
     of StructType:
       if t.structAdditional == nil: return
@@ -402,7 +405,7 @@ proc initWith(target: var TypeData, initExpr: var ExpressionNode) =
 
 proc initDefault(target: TypeData): ExpressionNode {.locks: 0.} =
   case target.kind:
-    of UnknownType, FunctionType, ArrayOfUnknownSizeType: assert(false); ExpressionNode()
+    of UnknownType, FunctionType, ArrayOfUnknownSizeType, VoidType: assert(false); ExpressionNode()
     of SimpleType, PointerType: ConstNumberNode(num: 0, typeData: target)
     of StructType: assert(false, "TODO"); ExpressionNode()
     of ArrayType:
@@ -462,6 +465,8 @@ proc fixArrayInit*(init: ArrayInitializerNode,
 method resolveTypes(ast: VarDeclNode, r: var TypeResolver) =
   procCall resolveTypes(ast.AstNode, r)
   ast.typeData.checkIncomplete(ast)
+  if ast.typeData.kind == VoidType:
+    ast.raiseError("Cannot define variable of void type!")
   if ast.init.isNone(): return
   if ast.init.get() of ArrayInitializerNode:
     let (x, _) = ast.init.get().ArrayInitializerNode.fixArrayInit(ast.typeData)
@@ -503,11 +508,15 @@ method resolveTypes(ast: FuncDeclNode, r: var TypeResolver) =
   procCall resolveTypes(ast.AstNode, r)
 method resolveTypes(ast: ReturnStatNode, r: var TypeResolver) =
   procCall resolveTypes(ast.AstNode, r)
-  ast.exp.arrayToAddr()
-  let t = ast.exp.typeData
-  if not t.isImplicitlyConvertible(r.currentReturnType):
-    ast.raiseError(fmt"Attempt to return type ""{t}"", expected {r.currentReturnType}")
-  ast.exp.insertConvertIfNeeded(r.currentReturnType)
+  if r.currentReturnType.kind == VoidType:
+    if ast.exp.isSome():
+      ast.raiseError(fmt"Attempt to return something, but current function is void!")
+  else:
+    ast.exp.get().arrayToAddr()
+    let t = ast.exp.get().typeData
+    if not t.isImplicitlyConvertible(r.currentReturnType):
+      ast.raiseError(fmt"Attempt to return type ""{t}"", expected {r.currentReturnType}")
+    ast.exp.get().insertConvertIfNeeded(r.currentReturnType)
 
 proc resolveTypes*(ast: VarDeclNode) =
   var r: TypeResolver
