@@ -299,11 +299,24 @@ proc lexToken*(lexer: var Lexer): Token =
             return lexer.initSymbol($c & $c, 2)
         else:
           return lexer.initSymbol($c, 1)
-      of '&', '|', '+', '-': # c, c=, cc
+      of '&', '|', '+': # c, c=, cc
         lexer.advance()
         if lexer.peek() == '=':
           lexer.advance()
           return lexer.initSymbol($c & '=', 2)
+        elif lexer.peek() == c:
+          lexer.advance()
+          return lexer.initSymbol($c & $c, 2)
+        else:
+          return lexer.initSymbol($c, 1)
+      of '-': # c, c=, cc, c>
+        lexer.advance()
+        if lexer.peek() == '=':
+          lexer.advance()
+          return lexer.initSymbol($c & '=', 2)
+        elif lexer.peek() == '>':
+          lexer.advance()
+          return lexer.initSymbol($c & '>', 2)
         elif lexer.peek() == c:
           lexer.advance()
           return lexer.initSymbol($c & $c, 2)

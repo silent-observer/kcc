@@ -321,6 +321,21 @@ proc parsePostfix(parser: var Parser): ExpressionNode =
         n.fields.add parser.parseIdent("Expected field name!")
         t = parser.peek()
       result = n
+    elif t.symbol == "->":
+      var n = parser.initNode(DotExprNode)
+      var n2 = parser.initNode(DereferenceExprNode)
+      n2.exp = result
+      n.exp = n2
+
+      parser.advance()
+      n.fields.add parser.parseIdent("Expected field name!")
+      t = parser.peek()
+      
+      while t.symbol == ".":
+        parser.advance()
+        n.fields.add parser.parseIdent("Expected field name!")
+        t = parser.peek()
+      result = n
     else:
       return
     t = parser.peek()

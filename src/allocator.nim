@@ -160,13 +160,21 @@ method allocateStack(ast: AstNode, a: var Allocator): AstNode {.base, locks: 0.}
   check(mstats, StatementNode)
   check(mblockItems, BlockItemNode)
 
+proc adjustParameterType(t: TypeData): TypeData =
+  if t.kind == ArrayOfUnknownSizeType or t.kind == ArrayType:
+    TypeData(kind: PointerType, ptrType: t.elemType)
+  else:
+    t
+
 method allocateStack(ast: FuncDeclNode, a: var Allocator): AstNode =
   a.localVarTableStack.addTable()
   for p in ast.params.mitems:
-    p.VarDeclNode.offset = 
+    template param: untyped = p.VarDeclNode
+    param.typeData = param.typeData.adjustParameterType()
+    param.offset = 
       a.localVarTableStack.addVar(
-        p.VarDeclNode.varName, 
-        p.VarDeclNode.typeData, 
+        param.varName, 
+        param.typeData, 
         Parameter, ast)
   discard procCall allocateStack(ast.AstNode, a)
   ast.maxStack = uint32(-a.localVarTableStack[^1].maxOffset)
