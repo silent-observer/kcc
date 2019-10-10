@@ -68,7 +68,7 @@ proc compile*(input: string, output: string, print: bool = true) =
 when isMainModule:
   var inputs: seq[string]
   var output = ""
-  var p = initOptParser("", shortNoVal = {'v'})
+  var p = initOptParser("")
   for kind, key, val in p.getopt():
     case kind:
       of cmdArgument: inputs.add key
