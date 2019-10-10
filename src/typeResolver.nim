@@ -214,13 +214,14 @@ method resolveTypes(ast: DotExprNode, r: var TypeResolver) =
   var i = 0
   ast.offset = 0
   while i < ast.fields.len:
-    if ast.exp.typeData.kind != StructType:
+    if t.kind != StructType:
       ast.raiseError(fmt"Cannot get field of non-struct type ""{t}""")
     if ast.fields[i] notin t.structAdditional.ids:
       ast.raiseError(fmt"Struct ""{t}"" has no field {ast.fields[i]}")
     let id = t.structAdditional.ids[ast.fields[i]]
     ast.offset += t.structAdditional.fields[id].offset
     t = t.structAdditional.fields[id].typeData
+    i += 1
   ast.typeData = t
 
 method resolveTypes(ast: UnaryExprNode, r: var TypeResolver) =

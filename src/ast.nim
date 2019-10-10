@@ -259,21 +259,21 @@ const SpacesInLevel = 2
 # array of pointers to int = int *a[10] = int *[10]
 # pointer to array of ints = int (*a)[10] = int (*)[10]
 proc `$`*(n: AstNode): string {.inline, locks: 0.}
-proc `$`*(t: TypeData): string {.locks: 0.} =
+proc toString(t: TypeData, showStructDefs: bool): string {.locks: 0.} =
   result = (case t.kind:
     of UnknownType: "<unknown type>"
-    of PointerType: "ptr to " & $t.ptrType[]
+    of PointerType: "ptr to " & t.ptrType[].toString(showStructDefs)
     of ArrayType: 
-      "array[" & $t.elemCount & "] of " & $t.elemType[]
+      "array[" & $t.elemCount & "] of " & t.elemType[].toString(showStructDefs)
     of ArrayOfUnknownSizeType:
-      "array[] of " & $t.elemType[]
+      "array[] of " & t.elemType[].toString(showStructDefs)
     of FunctionType: 
       var r = "function("
       if t.paramTypes.len > 0:
-        r &= $t.paramTypes[0]
+        r &= t.paramTypes[0].toString(showStructDefs)
         for param in t.paramTypes[1..^1]:
-          r &= ", " & $param
-      r & ") returning " & $t.funcReturnType[]
+          r &= ", " & param.toString(showStructDefs)
+      r & ") returning " & t.funcReturnType[].toString(showStructDefs)
     of SimpleType:
       case t.simpleType:
         of Int32: "int"
@@ -284,13 +284,14 @@ proc `$`*(t: TypeData): string {.locks: 0.} =
         of UInt8: "char"
     of StructType:
       var r = "struct " & t.structName
-      if t.structIsDefined:
+      if t.structIsDefined and showStructDefs:
         r &= " {"
         for d in t.structAdditional.fields:
           r &= strip($d) & "; "
         r &= "}"
       r
     )
+proc `$`*(t: TypeData): string {.locks: 0, inline.} = t.toString(false)
 
 converter toDeclType*(t: TypeData): DeclaratorTypeData =
   result = DeclaratorTypeData(kind: t.kind)
@@ -363,7 +364,7 @@ method toString(n: VarDeclNode, level: int): string =
   else:
     result &= "\p"
 method toString(n: TypeDeclNode, level: int): string =
-  spaces(level * SpacesInLevel) & &"TypeDeclNode {n.typeData}\p"
+  spaces(level * SpacesInLevel) & &"TypeDeclNode {n.typeData.toString(true)}\p"
 
 method toString(n: BreakStatNode, level: int): string =
   spaces(level * SpacesInLevel) & "BreakStatNode\p"

@@ -548,7 +548,7 @@ method generate(ast: AssignExprNode, g: var Generator, target: Register) =
     g.writeToAddrInReg(otherReg, target, ast.exp.typeData)
   elif ast.variable of VarNode:
     ast.raiseError("Unresolved assignment!")
-  elif not (ast.variable of ResolvedVarNode):
+  elif not (ast.variable of ResolvedVarNode or ast.variable of DotExprNode):
     ast.raiseError("Attempt to assign to rvalue!")
   else:
     ast.exp.generate(g, target)
