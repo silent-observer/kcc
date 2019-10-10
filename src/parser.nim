@@ -84,7 +84,6 @@ template initNode(parser: Parser, nodetype: typedesc): untyped =
   n
 
 proc parseStructType(parser: var Parser): TypeData =
-  echo "!"
   parser.parseKeyword(Struct, "Expected \"struct\"!")
   result = TypeData(kind: StructType)
   result.structName = parser.parseIdent("Expected struct name!")
