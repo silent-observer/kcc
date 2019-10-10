@@ -4,42 +4,18 @@ when not declared(Generator):
 proc getOtherRegUInt8(r: Register): Register {.inline.} =
   if r == Register(1): Register(2) else: Register(1)
 
-proc loadConstUInt8(g: var Generator, r: Register, num: int64) {.inline, used.} =
+proc loadConstUInt8(g: var Generator, r: Register, num: int64) {.inline.} =
   g.output &= &"  LDI {r}, {num}\p"
 
-proc pushOnStackUInt8(g: var Generator, r: Register) {.inline, used.} =
+proc pushOnStackUInt8(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  SB (SP), {r}\p" &
               &"  SUBI SP, 4\p"
 
-proc popFromStackUInt8(g: var Generator, r: Register) {.inline, used.} =
+proc popFromStackUInt8(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  ADDI SP, 4\p" &
               &"  LBU {r}, (SP)\p"
 
-proc writeToStackUInt8(offset: int, g: var Generator, dataReg: Register) {.used.} =
-  g.output &= &"  SB (FP{offset:+}), {dataReg}\p"
-
-proc writeToVarUInt8(ast: ResolvedVarNode, g: var Generator, offset: int, dataReg: Register) {.used.} =
-  if ast.isGlobal:
-    let otherReg = dataReg.getOtherRegUInt8()
-    if offset != 0:
-      g.output &= &"  LOAD {otherReg}, {ast.varName}[{offset}]\p"
-    else:
-      g.output &= &"  LOAD {otherReg}, {ast.varName}\p"
-    g.output &= &"  SB ({otherReg}), {dataReg}\p"
-  else:
-    writeToStackUInt8(ast.offset + offset, g, dataReg)
-
-proc readFromVarUInt8(ast: ResolvedVarNode, g: var Generator, offset: int, target: Register) {.used.} =
-  if ast.isGlobal:
-    if offset != 0:
-      g.output &= &"  LOAD {target}, {ast.varName}[{offset}]\p"
-    else:
-      g.output &= &"  LOAD {target}, {ast.varName}\p"
-    g.output &= &"  LBU {target}, ({target})\p"
-  else:
-    g.output &= &"  LBU {target}, (FP{ast.offset+offset:+})\p"
-
-proc writeToAddrUInt8(address: Address, g: var Generator, dataReg: Register) {.used.} =
+proc writeToAddrUInt8(address: Address, g: var Generator, dataReg: Register) =
   let offset = address.offset
   case address.kind:
     of Label:
@@ -56,7 +32,7 @@ proc writeToAddrUInt8(address: Address, g: var Generator, dataReg: Register) {.u
       address.exp.generate(g, otherReg)
       g.output &= &"  SB ({otherReg}{offset:+}), {dataReg}\p"
 
-proc readFromAddrUInt8(address: Address, g: var Generator, target: Register) {.used.} =
+proc readFromAddrUInt8(address: Address, g: var Generator, target: Register) =
   let offset = address.offset
   case address.kind:
     of Label:
@@ -71,18 +47,11 @@ proc readFromAddrUInt8(address: Address, g: var Generator, target: Register) {.u
       address.exp.generate(g, target)
       g.output &= &"  LBU {target}, ({target}{offset:+})\p"
 
-proc writeToAddrInRegUInt8(g: var Generator, dataReg, addrReg: Register) {.used.} =
+proc writeToAddrInRegUInt8(g: var Generator, dataReg, addrReg: Register) =
   g.output &= &"  SB ({addrReg}), {dataReg}\p"
 
-proc moveRegsUInt8(g: var Generator, dest, src: Register) {.inline, used.} =
+proc moveRegsUInt8(g: var Generator, dest, src: Register) {.inline.} =
   g.output &= &"  MOV {dest}, {src}\p"
-
-proc generateUInt8(ast: DereferenceExprNode, g: var Generator, target: Register) {.used.} =
-  ast.exp.generate(g, target)
-  g.output &= &"  LBU {target}, ({target})\p"
-
-proc generateUInt8(ast: ConstNumberNode, g: var Generator, target: Register) =
-  g.output &= &"  LDI {target}, {ast.num}\p"
 
 proc generateUInt8(ast: ConvertExprNode, g: var Generator, target: Register) =
   ast.exp.generate(g, target)

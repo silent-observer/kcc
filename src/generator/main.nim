@@ -24,15 +24,9 @@ defineChooseByType:
     {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
   proc loadConst(g: var Generator, r: Register, num: int64) {.inline.} =
     {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
-  proc writeToStack(offset: int, g: var Generator, dataReg: Register) =
-    {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
   proc writeToAddr(address: Address, g: var Generator, dataReg: Register) =
     {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
   proc readFromAddr(address: Address, g: var Generator, target: Register) =
-    {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
-  proc writeToVar(ast: ResolvedVarNode, g: var Generator, offset: int, dataReg: Register) =
-    {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
-  proc readFromVar(ast: ResolvedVarNode, g: var Generator, offset: int, target: Register) =
     {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
   proc writeToAddrInReg(g: var Generator, dataReg, addrReg: Register) =
     {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
@@ -495,7 +489,8 @@ proc initWithArray(init: ArrayInitializerNode, ast: VarDeclNode, g: var Generato
   var i = 0
   for e in init.elems:
     e.generate(g, Register(1))
-    writeToStack(ast.offset + i, g, Register(1), ast.typeData)
+    let address = Address(kind: RelativeFP, fpOffset: ast.offset, offset: i)
+    address.writeToAddr(g, Register(1), ast.typeData)
     i += elemSize
 
 method generate(ast: TypeDeclNode, g: var Generator) =
@@ -531,7 +526,8 @@ method generate(ast: VarDeclNode, g: var Generator) =
       g.output &= "\p"
     else:
       init.generate(g, Register(1))
-      ast.offset.writeToStack(g, Register(1), ast.typeData)
+      let address = Address(kind: RelativeFP, fpOffset: ast.offset, offset: 0)
+      address.writeToAddr(g, Register(1), ast.typeData)
       g.output &= "\p"
 
 method generate(ast: AssignExprNode, g: var Generator, target: Register) =
@@ -556,7 +552,8 @@ method generate(ast: AssignExprNode, g: var Generator, target: Register) =
     ast.raiseError("Attempt to assign to rvalue!")
   else:
     ast.exp.generate(g, target)
-    ast.variable.ResolvedVarNode.writeToVar(g, 0, target, ast.typeData)
+    let address = ast.variable.getAddress(g)
+    address.writeToAddr(g, target, ast.typeData)
 
 method generate(ast: CommaExprNode, g: var Generator, target: Register) =
   ast.exp1.generate(g, target)
@@ -567,6 +564,45 @@ method generate(ast: VarNode, g: var Generator, target: Register) =
 method generate(ast: ResolvedVarNode, g: var Generator, target: Register) =
   let address = ast.getAddress(g)
   address.readFromAddr(g, target, ast.typeData)
+method generate(ast: DotExprNode, g: var Generator, target: Register) =
+  let address = ast.getAddress(g)
+  address.readFromAddr(g, target, ast.typeData)
+
+method generate(ast: DereferenceExprNode, g: var Generator, target: Register) =
+  let address = Address(kind: Expression, exp: ast.exp, offset: 0)
+  address.readFromAddr(g, target, ast.typeData)
+
+method generate(ast: AddressExprNode, g: var Generator, target: Register) =
+  let address = ast.exp.getAddress(g)
+  case address.kind:
+    of Label: 
+      g.output &= &"  LOAD {target}, {address.label}"
+      if address.offset != 0:
+        g.output &= &"{address.offset:+}"
+      g.output &= "\p"
+    of RelativeFP:
+      g.output &= &"  ADDI {target}, FP, {address.fpOffset + address.offset}\p"
+    of Expression:
+      address.exp.generate(g, target)
+      if address.offset != 0:
+        g.output &= &"  ADDI {target}, {address.offset}\p"
+
+method generate(ast: FuncCallNode, g: var Generator, target: Register) =
+  g.output &= "  SW (SP), LR\p" &
+              "  SUBI SP, 4\p"
+  for i in countdown(ast.args.len - 1, 0):
+    ast.args[i].generate(g, target)
+    g.pushOnStack(target, ast.args[i].typeData)
+  g.output &= &"  ADDI LR, PC, 8\p" &
+              &"  JMPL {ast.funcName}\p"
+  let offset = ast.args.len * 4 + 4
+  g.output &= &"  ADDI SP, {offset}\p" &
+              &"  LW LR, (SP)\p"
+  if target != Register(1):
+    g.moveRegs(target, Register(1), ast.typeData)
+
+method generate(ast: ConstNumberNode, g: var Generator, target: Register) =
+  g.loadConst(target, ast.num, ast.typeData)
 
 method generate(ast: TernaryExprNode, g: var Generator, target: Register) =
   let endLabel = g.generateLabel("ternaryEnd")
@@ -601,61 +637,6 @@ method getAddress(ast: DotExprNode, g: var Generator): Address =
   result = ast.exp.getAddress(g)
   result.offset += ast.offset
 
-method generate(ast: AddressExprNode, g: var Generator, target: Register) =
-  let address = ast.exp.getAddress(g)
-  case address.kind:
-    of Label: 
-      g.output &= &"  LOAD {target}, {address.label}"
-      if address.offset != 0:
-        g.output &= &"{address.offset:+}"
-      g.output &= "\p"
-    of RelativeFP:
-      g.output &= &"  ADDI {target}, FP, {address.fpOffset + address.offset}\p"
-    of Expression:
-      address.exp.generate(g, target)
-      if address.offset != 0:
-        g.output &= &"  ADDI {target}, {address.offset}\p"
-
-method generate(ast: DotExprNode, g: var Generator, target: Register) =
-  let address = ast.getAddress(g)
-  case address.kind:
-    of Label: 
-      g.output &= &"  LOAD {target}, {address.label}"
-      if address.offset != 0:
-        g.output &= &"{address.offset:+}"
-      g.output &= "\p"
-    of RelativeFP:
-      g.output &= &"  ADDI {target}, FP, {address.fpOffset + address.offset}\p"
-    of Expression:
-      address.exp.generate(g, target)
-      if address.offset != 0:
-        g.output &= &"  ADDI {target}, {address.offset}\p"
-  if ast.exp of VarNode:
-    ast.raiseError("Unresolved address!")
-  elif ast.exp of DereferenceExprNode:
-    let deref = ast.exp.DereferenceExprNode
-    deref.exp.generate(g, target)
-    g.output &= &"  LW {target}, ({target}{ast.offset:+})\p"
-    return
-  elif not (ast.exp of ResolvedVarNode):
-    ast.raiseError("Cannot take address of rvalue!")
-  let variable = ast.exp.ResolvedVarNode
-  variable.readFromVar(g, ast.offset, target, ast.typeData)
-
-method generate(ast: FuncCallNode, g: var Generator, target: Register) =
-  g.output &= "  SW (SP), LR\p" &
-              "  SUBI SP, 4\p"
-  for i in countdown(ast.args.len - 1, 0):
-    ast.args[i].generate(g, target)
-    g.pushOnStack(target, ast.args[i].typeData)
-  g.output &= &"  ADDI LR, PC, 8\p" &
-              &"  JMPL {ast.funcName}\p"
-  let offset = ast.args.len * 4 + 4
-  g.output &= &"  ADDI SP, {offset}\p" &
-              &"  LW LR, (SP)\p"
-  if target != Register(1):
-    g.moveRegs(target, Register(1), ast.typeData)
-
 defineChooseByType:
   method generate(ast: UnaryExprNode, g: var Generator, target: Register) =
     {simpleType: [Int32, UInt32], ptrType: true}
@@ -665,9 +646,5 @@ defineChooseByType:
     {simpleType: [Int32, UInt32], ptrType: true}
   method generate(ast: BinaryRightConstExprNode, g: var Generator, target: Register) =
     {simpleType: [Int32, UInt32], ptrType: true}
-  method generate(ast: DereferenceExprNode, g: var Generator, target: Register) =
-    {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
-  method generate(ast: ConstNumberNode, g: var Generator, target: Register) =
-    {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
   method generate(ast: ConvertExprNode, g: var Generator, target: Register) =
     {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}

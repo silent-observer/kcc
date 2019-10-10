@@ -4,51 +4,27 @@ when not declared(Generator):
 proc getOtherRegInt32(r: Register): Register {.inline.} =
   if r == Register(1): Register(2) else: Register(1)
 
-proc test0Int32(g: var Generator, r: Register) {.inline, used.} =
+proc test0Int32(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  CMP {r}\p"
-proc testTwoInt32(g: var Generator, r1, r2: Register) {.inline, used.} =
+proc testTwoInt32(g: var Generator, r1, r2: Register) {.inline.} =
   g.output &= &"  CMP {r1}, {r2}\p"
-proc testConstInt32(g: var Generator, r1: Register, num: int64) {.inline, used.} =
+proc testConstInt32(g: var Generator, r1: Register, num: int64) {.inline.} =
   g.output &= &"  CMP {r1}, {num}\p"
-proc ltConditionInt32(): string {.inline, used.} = "LT"
-proc geConditionInt32(): string {.inline, used.} = "GE"
+proc ltConditionInt32(): string {.inline.} = "LT"
+proc geConditionInt32(): string {.inline.} = "GE"
 
-proc loadConstInt32(g: var Generator, r: Register, num: int64) {.inline, used.} =
+proc loadConstInt32(g: var Generator, r: Register, num: int64) {.inline.} =
   g.output &= &"  LOAD {r}, {num}\p"
 
-proc pushOnStackInt32(g: var Generator, r: Register) {.inline, used.} =
+proc pushOnStackInt32(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  SW (SP), {r}\p" &
               &"  SUBI SP, 4\p"
 
-proc popFromStackInt32(g: var Generator, r: Register) {.inline, used.} =
+proc popFromStackInt32(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  ADDI SP, 4\p" &
               &"  LW {r}, (SP)\p"
 
-proc writeToStackInt32(offset: int, g: var Generator, dataReg: Register) {.used.} =
-  g.output &= &"  SW (FP{offset:+}), {dataReg}\p"
-
-proc writeToVarInt32(ast: ResolvedVarNode, g: var Generator, offset: int, dataReg: Register) {.used.} =
-  if ast.isGlobal:
-    let otherReg = dataReg.getOtherRegInt32()
-    if offset != 0:
-      g.output &= &"  LOAD {otherReg}, {ast.varName}[{offset}]\p"
-    else:
-      g.output &= &"  LOAD {otherReg}, {ast.varName}\p"
-    g.output &= &"  SW ({otherReg}), {dataReg}\p"
-  else:
-    writeToStackInt32(ast.offset + offset, g, dataReg)
-
-proc readFromVarInt32(ast: ResolvedVarNode, g: var Generator, offset: int, target: Register) {.used.} =
-  if ast.isGlobal:
-    if offset != 0:
-      g.output &= &"  LOAD {target}, {ast.varName}[{offset}]\p"
-    else:
-      g.output &= &"  LOAD {target}, {ast.varName}\p"
-    g.output &= &"  LW {target}, ({target})\p"
-  else:
-    g.output &= &"  LW {target}, (FP{ast.offset+offset:+})\p"
-
-proc writeToAddrInt32(address: Address, g: var Generator, dataReg: Register) {.used.} =
+proc writeToAddrInt32(address: Address, g: var Generator, dataReg: Register) =
   let offset = address.offset
   case address.kind:
     of Label:
@@ -65,7 +41,7 @@ proc writeToAddrInt32(address: Address, g: var Generator, dataReg: Register) {.u
       address.exp.generate(g, otherReg)
       g.output &= &"  SW ({otherReg}{offset:+}), {dataReg}\p"
 
-proc readFromAddrInt32(address: Address, g: var Generator, target: Register) {.used.} =
+proc readFromAddrInt32(address: Address, g: var Generator, target: Register) =
   let offset = address.offset
   case address.kind:
     of Label:
@@ -80,17 +56,13 @@ proc readFromAddrInt32(address: Address, g: var Generator, target: Register) {.u
       address.exp.generate(g, target)
       g.output &= &"  LW {target}, ({target}{offset:+})\p"
 
-proc writeToAddrInRegInt32(g: var Generator, dataReg, addrReg: Register) {.used.} =
+proc writeToAddrInRegInt32(g: var Generator, dataReg, addrReg: Register) =
   g.output &= &"  SW ({addrReg}), {dataReg}\p"
 
-proc moveRegsInt32(g: var Generator, dest, src: Register) {.inline, used.} =
+proc moveRegsInt32(g: var Generator, dest, src: Register) {.inline.} =
   g.output &= &"  MOV {dest}, {src}\p"
 
-proc generateInt32(ast: DereferenceExprNode, g: var Generator, target: Register) {.used.} =
-  ast.exp.generate(g, target)
-  g.output &= &"  LW {target}, ({target})\p"
-
-proc generateInt32(ast: UnaryExprNode, g: var Generator, target: Register) {.used.} =
+proc generateInt32(ast: UnaryExprNode, g: var Generator, target: Register) =
   if ast.exp of DereferenceExprNode and ast.operator in ["++", "--"]:
     let otherReg = target.getOtherRegInt32()
     ast.exp.DereferenceExprNode.exp.generate(g, otherReg)
@@ -115,14 +87,16 @@ proc generateInt32(ast: UnaryExprNode, g: var Generator, target: Register) {.use
       elif not (ast.exp of ResolvedVarNode):
         ast.raiseError("Cannot increment rvalue!")
       g.output &= &"  ADDI {target}, 1\p"
-      ast.exp.ResolvedVarNode.writeToVarInt32(g, 0, target)
+      let address = ast.exp.getAddress(g)
+      address.writeToAddrInt32(g, target)
     of "--":
       if ast.exp of VarNode:
         ast.raiseError("Unresolved decrement!")
       elif not (ast.exp of ResolvedVarNode):
         ast.raiseError("Cannot decrement rvalue!")
       g.output &= &"  ADDI {target}, 1\p"
-      ast.exp.ResolvedVarNode.writeToVarInt32(g, 0, target)
+      let address = ast.exp.getAddress(g)
+      address.writeToAddrInt32(g, target)
     else: assert(false)
 
 proc generateInt32(ast: PostfixExprNode, g: var Generator, target: Register) =
@@ -151,7 +125,8 @@ proc generateInt32(ast: PostfixExprNode, g: var Generator, target: Register) =
     of "++": g.output &= &"  ADDI {otherReg}, {target}, 1\p"
     of "--": g.output &= &"  SUBI {otherReg}, {target}, 1\p"
     else: assert(false)
-  ast.exp.ResolvedVarNode.writeToVarInt32(g, 0, otherReg)
+  let address = ast.exp.getAddress(g)
+  address.writeToAddrInt32(g, otherReg)
 
 proc generateLogicalOrInt32(ast: BinaryExprNode, g: var Generator, target: Register) =
   let endLabel = g.generateLabel("logicOr")
@@ -310,9 +285,6 @@ proc generateInt32(ast: BinaryRightConstExprNode, g: var Generator, target: Regi
     of "^": g.output &= &"  XORI {target}, {ast.num}\p"
     of "|": g.output &= &"  ORI {target}, {ast.num}\p"
     else: assert(false)
-
-proc generateInt32(ast: ConstNumberNode, g: var Generator, target: Register) =
-  g.output &= &"  LOAD {target}, {ast.num}\p"
 
 proc generateInt32(ast: ConvertExprNode, g: var Generator, target: Register) =
   ast.exp.generate(g, target)

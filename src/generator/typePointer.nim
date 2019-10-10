@@ -4,51 +4,27 @@ when not declared(Generator):
 proc getOtherRegPointer(r: Register): Register {.inline.} =
   if r == Register(1): Register(2) else: Register(1)
 
-proc test0Pointer(g: var Generator, r: Register) {.inline, used.} =
+proc test0Pointer(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  CMP {r}\p"
-proc testTwoPointer(g: var Generator, r1, r2: Register) {.inline, used.} =
+proc testTwoPointer(g: var Generator, r1, r2: Register) {.inline.} =
   g.output &= &"  CMP {r1}, {r2}\p"
-proc testConstPointer(g: var Generator, r1: Register, num: int64) {.inline, used.} =
+proc testConstPointer(g: var Generator, r1: Register, num: int64) {.inline.} =
   g.output &= &"  CMP {r1}, {num}\p"
-proc ltConditionPointer(): string {.inline, used.} = "C"
-proc geConditionPointer(): string {.inline, used.} = "NC"
+proc ltConditionPointer(): string {.inline.} = "C"
+proc geConditionPointer(): string {.inline.} = "NC"
 
-proc loadConstPointer(g: var Generator, r: Register, num: int64) {.inline, used.} =
+proc loadConstPointer(g: var Generator, r: Register, num: int64) {.inline.} =
   g.output &= &"  LOAD {r}, {num}\p"
 
-proc pushOnStackPointer(g: var Generator, r: Register) {.inline, used.} =
+proc pushOnStackPointer(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  SW (SP), {r}\p" &
               &"  SUBI SP, 4\p"
 
-proc popFromStackPointer(g: var Generator, r: Register) {.inline, used.} =
+proc popFromStackPointer(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  ADDI SP, 4\p" &
               &"  LW {r}, (SP)\p"
 
-proc writeToStackPointer(offset: int, g: var Generator, dataReg: Register) {.used.} =
-  g.output &= &"  SW (FP{offset:+}), {dataReg}\p"
-
-proc writeToVarPointer(ast: ResolvedVarNode, g: var Generator, offset: int, dataReg: Register) {.used.} =
-  if ast.isGlobal:
-    let otherReg = dataReg.getOtherRegPointer()
-    if offset != 0:
-      g.output &= &"  LOAD {otherReg}, {ast.varName}[{offset}]\p"
-    else:
-      g.output &= &"  LOAD {otherReg}, {ast.varName}\p"
-    g.output &= &"  SW ({otherReg}), {dataReg}\p"
-  else:
-    writeToStackPointer(ast.offset + offset, g, dataReg)
-
-proc readFromVarPointer(ast: ResolvedVarNode, g: var Generator, offset: int, target: Register) {.used.} =
-  if ast.isGlobal:
-    if offset != 0:
-      g.output &= &"  LOAD {target}, {ast.varName}[{offset}]\p"
-    else:
-      g.output &= &"  LOAD {target}, {ast.varName}\p"
-    g.output &= &"  LW {target}, ({target})\p"
-  else:
-    g.output &= &"  LW {target}, (FP{ast.offset+offset:+})\p"
-
-proc writeToAddrPointer(address: Address, g: var Generator, dataReg: Register) {.used.} =
+proc writeToAddrPointer(address: Address, g: var Generator, dataReg: Register) =
   let offset = address.offset
   case address.kind:
     of Label:
@@ -65,7 +41,7 @@ proc writeToAddrPointer(address: Address, g: var Generator, dataReg: Register) {
       address.exp.generate(g, otherReg)
       g.output &= &"  SW ({otherReg}{offset:+}), {dataReg}\p"
 
-proc readFromAddrPointer(address: Address, g: var Generator, target: Register) {.used.} =
+proc readFromAddrPointer(address: Address, g: var Generator, target: Register) =
   let offset = address.offset
   case address.kind:
     of Label:
@@ -80,13 +56,13 @@ proc readFromAddrPointer(address: Address, g: var Generator, target: Register) {
       address.exp.generate(g, target)
       g.output &= &"  LW {target}, ({target}{offset:+})\p"
 
-proc writeToAddrInRegPointer(g: var Generator, dataReg, addrReg: Register) {.used.} =
+proc writeToAddrInRegPointer(g: var Generator, dataReg, addrReg: Register) =
   g.output &= &"  SW ({addrReg}), {dataReg}\p"
 
-proc moveRegsPointer(g: var Generator, dest, src: Register) {.inline, used.} =
+proc moveRegsPointer(g: var Generator, dest, src: Register) {.inline.} =
   g.output &= &"  MOV {dest}, {src}\p"
 
-proc generatePointer(ast: UnaryExprNode, g: var Generator, target: Register) {.used.} =
+proc generatePointer(ast: UnaryExprNode, g: var Generator, target: Register) =
   if ast.exp of DereferenceExprNode and ast.operator in ["++", "--"]:
     let otherReg = target.getOtherRegPointer()
     ast.exp.DereferenceExprNode.exp.generate(g, otherReg)
@@ -106,14 +82,16 @@ proc generatePointer(ast: UnaryExprNode, g: var Generator, target: Register) {.u
       elif not (ast.exp of ResolvedVarNode):
         ast.raiseError("Cannot increment rvalue!")
       g.output &= &"  ADDI {target}, {ast.exp.typeData.getSize}\p"
-      ast.exp.ResolvedVarNode.writeToVarPointer(g, 0, target)
+      let address = ast.exp.getAddress(g)
+      address.writeToAddrPointer(g, target)
     of "--":
       if ast.exp of VarNode:
         ast.raiseError("Unresolved decrement!")
       elif not (ast.exp of ResolvedVarNode):
         ast.raiseError("Cannot decrement rvalue!")
       g.output &= &"  SUBI {target}, {ast.exp.typeData.getSize}\p"
-      ast.exp.ResolvedVarNode.writeToVarPointer(g, 0, target)
+      let address = ast.exp.getAddress(g)
+      address.writeToAddrPointer(g, target)
     else: assert(false)
 
 proc generatePointer(ast: PostfixExprNode, g: var Generator, target: Register) =
@@ -141,7 +119,8 @@ proc generatePointer(ast: PostfixExprNode, g: var Generator, target: Register) =
     of "++": g.output &= &"  ADDI {otherReg}, {target}, 1\p"
     of "--": g.output &= &"  SUBI {otherReg}, {target}, 1\p"
     else: assert(false)
-  ast.exp.ResolvedVarNode.writeToVarPointer(g, 0, otherReg)
+  let address = ast.exp.getAddress(g)
+  address.writeToAddrPointer(g, otherReg)
 
 
 proc generatePointer(ast: BinaryExprNode, g: var Generator, target: Register) =
@@ -223,13 +202,6 @@ proc generatePointer(ast: BinaryRightConstExprNode, g: var Generator, target: Re
     of "-": g.output &= &"  SUBI {target}, {ast.num * size}\p"
     of "+": g.output &= &"  ADDI {target}, {ast.num * size}\p"
     else: assert(false)
-
-proc generatePointer(ast: DereferenceExprNode, g: var Generator, target: Register) {.used.} =
-  ast.exp.generate(g, target)
-  g.output &= &"  LW {target}, ({target})\p"
-
-proc generatePointer(ast: ConstNumberNode, g: var Generator, target: Register) =
-  g.output &= &"  LOAD {target}, {ast.num}\p"
 
 proc generatePointer(ast: ConvertExprNode, g: var Generator, target: Register) =
   ast.exp.generate(g, target)
