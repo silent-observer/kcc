@@ -44,3 +44,5 @@ suite "Compile, link and run":
     compileLinkAndRun("ptrTest", 1000, "00000096")
   test "typesTest":
     compileLinkAndRun("typesTest", 1000, "0000003C")
+  test "structTest":
+    compileLinkAndRun("structTest", 1000, "0000000E")
