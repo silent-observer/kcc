@@ -65,8 +65,6 @@ proc isType(t: Token): bool {.inline.} =
   if t.kind == Keyword:
     return t.keyword in {Int, Short, Char, Unsigned, Signed, Struct};
   return false;
-proc isLvalue(ast: ExpressionNode): bool {.inline.} =
-  ast of VarNode or ast of DereferenceExprNode
 
 proc parseExpression(parser: var Parser): ExpressionNode
 proc parseAssignment(parser: var Parser): ExpressionNode
@@ -310,7 +308,7 @@ proc parsePostfix(parser: var Parser): ExpressionNode =
       n.exp = nAdd
       result = n
       parser.parseSymbol("]", "Expected right bracket!")
-    elif result.isLvalue and t.symbol in ["++", "--"]:
+    elif t.symbol in ["++", "--"]:
       var n = parser.initNode(PostfixExprNode)
       n.exp = result
       n.operator = t.symbol
@@ -323,6 +321,7 @@ proc parsePostfix(parser: var Parser): ExpressionNode =
         parser.advance()
         n.fields.add parser.parseIdent("Expected field name!")
         t = parser.peek()
+      result = n
     else:
       return
     t = parser.peek()
@@ -371,28 +370,28 @@ proc parseTernary(parser: var Parser): ExpressionNode =
     result.TernaryExprNode.elseClause = parser.parseTernary()
 proc parseAssignment(parser: var Parser): ExpressionNode =
   result = parser.parseTernary()
-  if result.isLvalue:
-    let t = parser.peek()
-    if t.kind != Symbol:
-      return
-    if t.symbol == "=":
-      var n = parser.initNode(AssignExprNode)
-      parser.advance()
-      n.variable = result
-      n.exp = parser.parseAssignment()
-      result = n
-    elif t.symbol in ["+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|="]:
-      var nBin = parser.initNode(BinaryExprNode)
-      var n = parser.initNode(AssignExprNode)
-      parser.advance()
 
-      nBin.operator = t.symbol[0..^2]
-      nBin.exp1 = result
-      nBin.exp2 = parser.parseAssignment()
-      
-      n.variable = result
-      n.exp = nBin
-      result = n
+  let t = parser.peek()
+  if t.kind != Symbol:
+    return
+  if t.symbol == "=":
+    var n = parser.initNode(AssignExprNode)
+    parser.advance()
+    n.variable = result
+    n.exp = parser.parseAssignment()
+    result = n
+  elif t.symbol in ["+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|="]:
+    var nBin = parser.initNode(BinaryExprNode)
+    var n = parser.initNode(AssignExprNode)
+    parser.advance()
+
+    nBin.operator = t.symbol[0..^2]
+    nBin.exp1 = result
+    nBin.exp2 = parser.parseAssignment()
+    
+    n.variable = result
+    n.exp = nBin
+    result = n
 proc parseExpression(parser: var Parser): ExpressionNode =
   result = parser.parseAssignment()
   var next = parser.peek()
