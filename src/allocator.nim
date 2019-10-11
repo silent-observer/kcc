@@ -27,7 +27,7 @@ type
 const
   WordSize = 4
   StartOffset = 3
-  ParameterStartOffset = 5
+  ParameterStartOffset = 8
 
 proc reportError*(e: AllocationError, input: string): string =
   result = "Allocation Error occured!\n" & e.msg & "\nLine " & $e.line & ":\n"
@@ -94,9 +94,9 @@ proc calcOffset(typeData: TypeData, offset: var int, kind: VariableKind): int =
     result = offset + 1
     #echo "result: ", result
   else:
+    result = offset
     offset += size
-    offset = alignAddress(offset - 1, false, align) + 1
-    result = offset - 1
+    offset = alignAddress(offset, false, align)
 proc addVar(s: var VariableTableStack, name: string, typeData: TypeData, 
     kind: VariableKind, ast: AstNode): int  =
   if name in s[^1].t:
