@@ -121,14 +121,27 @@ method resolveStructs(ast: TypeDeclNode, r: var StructResolver) {.locks: 0.} =
     let entry = r.findStruct(name, ast)
     ast.typeData.structAdditional = entry.typeData.structAdditional
 
+proc resolveStructsInType(t: var TypeData, r: var StructResolver, ast: AstNode) {.locks: 0.} =
+  case t.kind:
+    of UnknownType, VoidType, SimpleType: return
+    of PointerType: 
+      t.ptrType[].resolveStructsInType(r, ast)
+    of ArrayType, ArrayOfUnknownSizeType:
+      t.elemType[].resolveStructsInType(r, ast)
+    of FunctionType:
+      t.funcReturnType[].resolveStructsInType(r, ast)
+      for p in t.paramTypes.mitems:
+        p.resolveStructsInType(r, ast)
+    of StructType:
+      if t.structIsDefined:
+        t.defineStruct(ast, r)
+      else:
+        let name = t.structName
+        let entry = r.findStruct(name, ast)
+        t.structAdditional = entry.typeData.structAdditional
+
 method resolveStructs(ast: VarDeclNode, r: var StructResolver) {.locks: 0.} =
-  if ast.typeData.kind != StructType: return
-  if ast.typeData.structIsDefined:
-    ast.typeData.defineStruct(ast, r)
-  else:
-    let name = ast.typeData.structName
-    let entry = r.findStruct(name, ast)
-    ast.typeData.structAdditional = entry.typeData.structAdditional
+  ast.typeData.resolveStructsInType(r, ast)
 
 method resolveStructs(ast: FuncDeclNode, r: var StructResolver) =
   r.structTableStack.addTable()

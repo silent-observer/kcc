@@ -18,7 +18,6 @@ proc compile*(input: string, output: string, print: bool = true): bool =
       echo "\pAST:"
       echo ast
 
-    ast.verifyFuncs()
     if Optimize:
       ast.optimizeBeforeAlloc()
     
@@ -27,6 +26,8 @@ proc compile*(input: string, output: string, print: bool = true): bool =
     if print:
       echo "\pAST (resolved structs):"
       echo ast
+
+    ast.verifyFuncs()
 
     ast.allocateStack()
     

@@ -81,7 +81,8 @@ proc areCompatible*(a, b: TypeData): bool {.locks: 0.} =
     of SimpleType: return a.simpleType == b.simpleType
     of StructType:
       if a.structName != b.structName: return false
-      if a.structAdditional == nil or a.structAdditional == nil: return true
+      if not a.structIsDefined or not b.structIsDefined: return true
+      if a.structAdditional == nil or b.structAdditional == nil: return true
       let addA = a.structAdditional
       let addB = b.structAdditional
       if addA.fields.len != addB.fields.len: return false
@@ -163,7 +164,7 @@ proc checkIncomplete(t: TypeData, ast: AstNode) {.locks: 0.} =
     of VoidType: return
     of PointerType: t.ptrType[].checkIncomplete(ast)
     of StructType:
-      if t.structAdditional == nil: return
+      if t.structAdditional == nil or not t.structIsDefined: return
       for f in t.structAdditional.fields:
         if f.typeData.isIncomplete():
           ast.raiseError("Cannot have incomplete type {t.elemType} as field of a string!")
