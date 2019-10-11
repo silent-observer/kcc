@@ -145,6 +145,7 @@ method resolveStructs(ast: VarDeclNode, r: var StructResolver) {.locks: 0.} =
 
 method resolveStructs(ast: FuncDeclNode, r: var StructResolver) =
   r.structTableStack.addTable()
+  ast.returnType.resolveStructsInType(r, ast)
   for p in ast.params.mitems:
     p.resolveStructs(r)
   procCall resolveStructs(ast.AstNode, r)
