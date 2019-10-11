@@ -263,7 +263,7 @@ const SpacesInLevel = 2
 # array of pointers to int = int *a[10] = int *[10]
 # pointer to array of ints = int (*a)[10] = int (*)[10]
 proc `$`*(n: AstNode): string {.inline, locks: 0.}
-proc toString(t: TypeData, showStructDefs: bool): string {.locks: 0.} =
+proc toString*(t: TypeData, showStructDefs: bool): string {.locks: 0.} =
   result = (case t.kind:
     of UnknownType: "<unknown type>"
     of VoidType: "void"
@@ -541,4 +541,8 @@ proc getAlignedSize*(t: TypeData): int =
   let align = t.getAlign()
   while result mod align != 0:
     result.inc
-  
+
+proc isLvalue*(ast: AstNode): bool =
+  ast of ResolvedVarNode or
+  ast of DereferenceExprNode or
+  ast of DotExprNode
