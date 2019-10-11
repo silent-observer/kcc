@@ -56,8 +56,8 @@ proc readFromAddrUInt32(address: Address, g: var Generator, target: Register) =
       address.exp.generate(g, target)
       g.output &= &"  LW {target}, ({target}{offset:+})\p"
 
-proc writeToAddrInRegUInt32(g: var Generator, dataReg, addrReg: Register) =
-  g.output &= &"  SW ({addrReg}), {dataReg}\p"
+proc writeToAddrInRegUInt32(g: var Generator, dataReg, addrReg: Register, offset: int = 0) =
+  g.output &= &"  SW ({addrReg}{offset:+}), {dataReg}\p"
 
 proc moveRegsUInt32(g: var Generator, dest, src: Register) {.inline.} =
   g.output &= &"  MOV {dest}, {src}\p"
@@ -73,33 +73,55 @@ proc generateUInt32(ast: UnaryExprNode, g: var Generator, target: Register) =
       g.output &= &"  SUBI {target}, 1\p"
     g.writeToAddrInRegUInt32(target, otherReg)
     return
-  ast.exp.generate(g, target)
+  if ast.operator notin ["++", "--"]:
+    ast.exp.generate(g, target)
   case ast.operator:
     of "-": g.output &= &"  SUB {target}, R0, {target}\p"
     of "~": g.output &= &"  XORI {target}, -1\p"
-    of "++":
+    of "++", "--":
+      let otherReg = target.getOtherRegUInt32()
       if ast.exp of VarNode:
         ast.raiseError("Unresolved increment!")
-      elif not (ast.exp of ResolvedVarNode):
-        ast.raiseError("Cannot increment rvalue!")
-      g.output &= &"  ADDI {target}, 1\p"
+      elif not ast.exp.isLvalue:
+        ast.raiseError(if ast.operator == "++": "Cannot increment rvalue!" else: "Cannot decrement rvalue!")
+      
       let address = ast.exp.getAddress(g)
-      address.writeToAddrUInt32(g, target)
-    of "--":
-      if ast.exp of VarNode:
-        ast.raiseError("Unresolved decrement!")
-      elif not (ast.exp of ResolvedVarNode):
-        ast.raiseError("Cannot decrement rvalue!")
-      g.output &= &"  ADDI {target}, 1\p"
-      let address = ast.exp.getAddress(g)
-      address.writeToAddrUInt32(g, target)
+      if address.kind == RelativeFP:
+        ast.exp.generate(g, target)
+        if ast.operator == "++":
+          g.output &= &"  ADDI {target}, 1\p"
+        else:
+          g.output &= &"  SUBI {target}, 1\p"
+        address.writeToAddrUInt32(g, target)
+      else:
+        address.loadAddr(g, otherReg, false)
+        g.output &= &"  LW {target}, ({otherReg}{address.offset:+})\p"
+        if ast.operator == "++":
+          g.output &= &"  ADDI {target}, 1\p"
+        else:
+          g.output &= &"  SUBI {target}, 1\p"
+        g.writeToAddrInRegUInt32(target, otherReg, address.offset)
     else: assert(false)
-
+  
 proc generateUInt32(ast: PostfixExprNode, g: var Generator, target: Register) =
+  if not ast.exp.isLvalue:
+    ast.raiseError(
+      if ast.operator == "++": "Cannot increment rvalue!" 
+      else: "Cannot decrement rvalue!")
+
+  let address = ast.exp.getAddress(g)
   let otherReg = target.getOtherRegUInt32()
-  if ast.exp of DereferenceExprNode:
-    ast.exp.DereferenceExprNode.exp.generate(g, otherReg)
-    g.output &= &"  LW {target}, ({otherReg})\p"
+  
+  if address.kind == RelativeFP:
+    ast.exp.generate(g, target)
+    case ast.operator:
+      of "++": g.output &= &"  ADDI {otherReg}, {target}, 1\p"
+      of "--": g.output &= &"  SUBI {otherReg}, {target}, 1\p"
+      else: assert(false)
+    address.writeToAddrUInt32(g, otherReg)
+  else:
+    address.loadAddr(g, otherReg, false)
+    g.output &= &"  LW {target}, ({otherReg}{address.offset:+})\p"
     if ast.operator == "++":
       g.output &= &"  ADDI {target}, 1\p"
     else:
@@ -109,19 +131,6 @@ proc generateUInt32(ast: PostfixExprNode, g: var Generator, target: Register) =
       g.output &= &"  SUBI {target}, 1\p"
     else:
       g.output &= &"  ADDI {target}, 1\p"
-    return
-  
-  if not (ast.exp of ResolvedVarNode):
-    ast.raiseError(
-      if ast.operator == "++": "Unresolved increment!" 
-      else: "Unresolved decrement!")
-  ast.exp.generate(g, target)
-  case ast.operator:
-    of "++": g.output &= &"  ADDI {otherReg}, {target}, 1\p"
-    of "--": g.output &= &"  SUBI {otherReg}, {target}, 1\p"
-    else: assert(false)
-  let address = ast.exp.getAddress(g)
-  address.writeToAddrUInt32(g, otherReg)
 
 
 proc generateUInt32(ast: BinaryExprNode, g: var Generator, target: Register) =

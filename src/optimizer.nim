@@ -138,6 +138,16 @@ method optimizeIncDec(ast: ExprStatNode): AstNode =
       operator: ast.exp.get().PostfixExprNode.operator, 
       exp: ast.exp.get().PostfixExprNode.exp).ExpressionNode.some()
   return nil
+method optimizeIncDec(ast: ForStatNode): AstNode =
+  if ast.postExp.isSome() and ast.postExp.get() of PostfixExprNode:
+    ast.postExp = UnaryExprNode(
+      operator: ast.postExp.get().PostfixExprNode.operator, 
+      exp: ast.postExp.get().PostfixExprNode.exp).ExpressionNode.some()
+  if ast.kind == ForWithExp and ast.initExp of PostfixExprNode:
+    ast.initExp = UnaryExprNode(
+      operator: ast.initExp.PostfixExprNode.operator, 
+      exp: ast.initExp.PostfixExprNode.exp)
+  return nil
 
 proc optimizeConstExpr*(ast: var ExpressionNode) =
   let n = ast.optimizeConsts()

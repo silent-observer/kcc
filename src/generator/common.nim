@@ -62,8 +62,7 @@ proc isOneLevel(exp: ExpressionNode): bool {.locks: 0.} =
       return false
     return exp.AssignExprNode.exp.isOneLevel() and exp.AssignExprNode.variable.isOneLevel()
   elif exp of UnaryExprNode:
-    if exp.UnaryExprNode.operator in ["++", "--"] and 
-       exp.UnaryExprNode.exp of DereferenceExprNode: return false
+    if exp.UnaryExprNode.operator in ["++", "--"]: return false
     return exp.UnaryExprNode.exp.isOneLevel()
   elif exp of DereferenceExprNode:
     return exp.DereferenceExprNode.exp.isOneLevel()
@@ -230,3 +229,18 @@ proc multiplyByConst(g: var Generator, r: Register, num: int) {.locks: 0.} =
     &"  LOAD {otherReg}, {num}\p" &
     &"  MLTS {r}, {otherReg}\p" &
     &"  MOV {r}, LO\p"
+
+proc loadAddr(address: Address, g: var Generator, r: Register, includeOffset: bool) =
+  let offset = address.offset
+  case address.kind:
+    of Label:
+      if offset != 0 and includeOffset:
+        g.output &= &"  LOAD {r}, {address.label}[{offset}]\p"
+      else:
+        g.output &= &"  LOAD {r}, {address.label}\p"
+    of RelativeFP:
+      g.output &= &"  ADDI {r}, FP, {offset + address.fpOffset}\p"
+    of Expression:
+      address.exp.generate(g, r)
+      if offset != 0 and includeOffset:
+        g.output &= &"  ADDI {r}, {offset}\p"

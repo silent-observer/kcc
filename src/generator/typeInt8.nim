@@ -15,8 +15,8 @@ proc popFromStackInt8(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  ADDI SP, 4\p" &
               &"  LBS {r}, (SP)\p"
 
-proc writeToAddrInRegInt8(g: var Generator, dataReg, addrReg: Register) =
-  g.output &= &"  SB ({addrReg}), {dataReg}\p"
+proc writeToAddrInRegInt8(g: var Generator, dataReg, addrReg: Register, offset: int = 0) =
+  g.output &= &"  SB ({addrReg}{offset:+}), {dataReg}\p"
 
 proc writeToAddrInt8(address: Address, g: var Generator, dataReg: Register) =
   let offset = address.offset

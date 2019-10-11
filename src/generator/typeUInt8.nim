@@ -47,8 +47,8 @@ proc readFromAddrUInt8(address: Address, g: var Generator, target: Register) =
       address.exp.generate(g, target)
       g.output &= &"  LBU {target}, ({target}{offset:+})\p"
 
-proc writeToAddrInRegUInt8(g: var Generator, dataReg, addrReg: Register) =
-  g.output &= &"  SB ({addrReg}), {dataReg}\p"
+proc writeToAddrInRegUInt8(g: var Generator, dataReg, addrReg: Register, offset: int = 0) =
+  g.output &= &"  SB ({addrReg}{offset:+}), {dataReg}\p"
 
 proc moveRegsUInt8(g: var Generator, dest, src: Register) {.inline.} =
   g.output &= &"  MOV {dest}, {src}\p"

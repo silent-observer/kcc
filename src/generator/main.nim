@@ -28,7 +28,7 @@ defineChooseByType:
     {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
   proc readFromAddr(address: Address, g: var Generator, target: Register) =
     {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
-  proc writeToAddrInReg(g: var Generator, dataReg, addrReg: Register) =
+  proc writeToAddrInReg(g: var Generator, dataReg, addrReg: Register, offset: int) =
     {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
   proc getOtherReg(r: Register): Register {.inline.} =
     {simpleType: [Int8, Int16, Int32, UInt8, UInt16, UInt32], ptrType: true}
@@ -214,6 +214,8 @@ method generate(ast: FuncDeclNode, g: var Generator) =
     s.generate(g)
   if ast.statements.get().items.len == 0 or 
       not (ast.statements.get().items[^1] of ReturnStatNode):
+    if ast.name == "main":
+      g.output &= &"  MOV R1, R0\p"
     if g.currentFunc.maxStack != 0:
       g.output &= &"  ADDI SP, {g.currentFunc.maxStack}\p"
     g.output &= "  ADDI SP, FP, 4\p" &
@@ -500,9 +502,18 @@ method generate(ast: VarDeclNode, g: var Generator) =
   if ast.isGlobal:
     if ast.init.isNone():
       g.outputBss &= &"{ast.varName}:\p"
-      g.outputBss &= (case ast.typeData.getSize:
+      var s = ast.typeData.getSize
+      if s >= 4:
+        g.outputBss &= "  DW "
+        while s >= 4:
+          g.outputBss &= "0"
+          if s >= 8: g.outputBss &= ", "
+          s -= 4
+        g.outputBss &= "\p"
+      g.outputBss &= (case s:
         of 1: "  DB 0\p"
         of 2: "  DH 0\p"
+        of 3: "  DH 0\p" & "  DB 0\p"
         of 4: "  DW 0\p"
         else: "")
     else:
@@ -546,10 +557,10 @@ method generate(ast: AssignExprNode, g: var Generator, target: Register) =
       g.pushOnStack(target, ast.exp.typeData)
       ast.variable.DereferenceExprNode.exp.generate(g, target)
       g.popFromStack(otherReg, ast.exp.typeData)
-    g.writeToAddrInReg(otherReg, target, ast.exp.typeData)
+    g.writeToAddrInReg(otherReg, target, 0, ast.exp.typeData)
   elif ast.variable of VarNode:
     ast.raiseError("Unresolved assignment!")
-  elif not (ast.variable of ResolvedVarNode or ast.variable of DotExprNode):
+  elif not ast.variable.isLvalue:
     ast.raiseError("Attempt to assign to rvalue!")
   else:
     ast.exp.generate(g, target)
