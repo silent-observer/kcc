@@ -136,7 +136,7 @@ proc lexOct(lexer: var Lexer, startIndex: int): Token =
       else:
         return lexer.initNumConst(val, lexer.index - startIndex)
     else:
-      val += (c.int64 - '0'.int64) + val * 8
+      val = (c.int64 - '0'.int64) + val * 8
     lexer.advance()
 
 proc lexHex(lexer: var Lexer, startIndex: int): Token =
@@ -144,11 +144,11 @@ proc lexHex(lexer: var Lexer, startIndex: int): Token =
   while true:
     let c = lexer.peek()
     if c in {'0'..'9'}:
-      val += (c.int64 - '0'.int64) + val * 16
+      val = (c.int64 - '0'.int64) + val * 16
     elif c in {'A'..'F'}:
-      val += (c.int64 - 'A'.int64 + 10) + val * 16
+      val = (c.int64 - 'A'.int64 + 10) + val * 16
     elif c in {'a'..'f'}:
-      val += (c.int64 - 'a'.int64 + 10) + val * 16
+      val = (c.int64 - 'a'.int64 + 10) + val * 16
     else:
       if val == 0:
         lexer.raiseError("Invalid number constant!", lexer.index - startIndex)
