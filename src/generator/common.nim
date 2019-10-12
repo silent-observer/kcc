@@ -68,6 +68,8 @@ proc isOneLevel(exp: ExpressionNode): bool {.locks: 0.} =
     return exp.DereferenceExprNode.exp.isOneLevel()
   elif exp of AddressExprNode:
     return exp.AddressExprNode.exp.isOneLevel()
+  elif exp of ConvertExprNode:
+    return exp.ConvertExprNode.exp.isOneLevel()
   elif (exp of BinaryRightConstExprNode) and 
       (exp.BinaryRightConstExprNode.operator in 
         ["||", "&&", "+", "-", "&", "^", "|", "==", "!=", "<", ">=", "<<", ">>"]):
