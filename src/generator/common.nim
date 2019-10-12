@@ -228,7 +228,7 @@ proc multiplyByConst(g: var Generator, r: Register, num: int) {.locks: 0.} =
       &"  SUB {r}, R0, {r}\p" &
       &"  ASHI {r}, {shift}\p"
   else: g.output &= 
-    &"  LOAD {otherReg}, {num}\p" &
+    &"  LOAD {otherReg}, {num and 0xFFFFFFFF}\p" &
     &"  MLTS {r}, {otherReg}\p" &
     &"  MOV {r}, LO\p"
 
@@ -246,3 +246,24 @@ proc loadAddr(address: Address, g: var Generator, r: Register, includeOffset: bo
       address.exp.generate(g, r)
       if offset != 0 and includeOffset:
         g.output &= &"  ADDI {r}, {offset}\p"
+
+proc toSignedByte(num: int64): int64 =
+  if num >= -128 and num < 256:
+    return num
+  else:
+    if (num and 0x80) != 0: return (num and 0xFF) - 256
+    else: return num and 0xFF
+
+proc toSignedHalfWord(num: int64): int64 =
+  if num >= -65536 and num < 65536:
+    return num
+  else:
+    if (num and 0x8000) != 0: return (num and 0xFFFF) - 65536
+    else: return num and 0xFFFF
+
+proc toSignedWord(num: int64): int64 =
+  if num >= -0x100000000 and num < 0x100000000:
+    return num
+  else:
+    if (num and 0x80000000) != 0: return (num and 0xFFFFFFFF) - 0x100000000
+    else: return num and 0xFFFFFFFF

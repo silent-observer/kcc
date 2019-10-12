@@ -5,7 +5,7 @@ proc getOtherRegInt8(r: Register): Register {.inline.} =
   if r == Register(1): Register(2) else: Register(1)
 
 proc loadConstInt8(g: var Generator, r: Register, num: int64) {.inline.} =
-  g.output &= &"  LDI {r}, {num}\p"
+  g.output &= &"  LDI {r}, {num.toSignedByte}\p"
 
 proc pushOnStackInt8(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  SB (SP), {r}\p" &

@@ -17,7 +17,7 @@ proc ltConditionPointer(): string {.inline.} = "C"
 proc geConditionPointer(): string {.inline.} = "NC"
 
 proc loadConstPointer(g: var Generator, r: Register, num: int64) {.inline.} =
-  g.output &= &"  LOAD {r}, {num}\p"
+  g.output &= &"  LOAD {r}, {num and 0xFFFFFFFF}\p"
 
 proc pushOnStackPointer(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  SW (SP), {r}\p" &

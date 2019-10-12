@@ -17,7 +17,7 @@ proc ltConditionUInt32(): string {.inline.} = "C"
 proc geConditionUInt32(): string {.inline.} = "NC"
 
 proc loadConstUInt32(g: var Generator, r: Register, num: int64) {.inline.} =
-  g.output &= &"  LOAD {r}, {num}\p"
+  g.output &= &"  LOAD {r}, {num and 0xFFFFFFFF}\p"
 
 proc pushOnStackUInt32(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  SW (SP), {r}\p" &
@@ -209,12 +209,12 @@ proc generateUInt32(ast: BinaryRightConstExprNode, g: var Generator, target: Reg
       of "<<", ">>", "^", "|", "+", "-": discard
       of "*", "&": g.output &= &"  MOV {target}, R0\p"
       of "/": g.output &= 
-          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  LOAD {otherReg}, {ast.num and 0xFFFFFFFF}\p" &
           &"  DIVU {target}, {otherReg}\p" &
            "  NOP\p".repeat(11) &
           &"  MOV {target}, LO\p"
       of "%": g.output &= 
-          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  LOAD {otherReg}, {ast.num and 0xFFFFFFFF}\p" &
           &"  DIVU {target}, {otherReg}\p" &
            "  NOP\p".repeat(11) &
           &"  MOV {target}, HI\p"
@@ -249,12 +249,12 @@ proc generateUInt32(ast: BinaryRightConstExprNode, g: var Generator, target: Reg
       of "+": g.output &= &"  ADDI {target}, {ast.num}\p"
       of "*": g.multiplyByConst(target, ast.num.int)
       of "/": g.output &= 
-          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  LOAD {otherReg}, {ast.num and 0xFFFFFFFF}\p" &
           &"  DIVU {target}, {otherReg}\p" &
           "  NOP\p".repeat(11) &
           &"  MOV {target}, LO\p"
       of "%": g.output &= 
-          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  LOAD {otherReg}, {ast.num and 0xFFFFFFFF}\p" &
           &"  DIVU {target}, {otherReg}\p" &
           "  NOP\p".repeat(11) &
           &"  MOV {target}, HI\p"
@@ -276,12 +276,12 @@ proc generateUInt32(ast: BinaryRightConstExprNode, g: var Generator, target: Reg
           &"  LDI?C* {target}, 0\p" &
           &"  LDI?NC* {target}, 1\p"
       of ">": g.output &= 
-          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  LOAD {otherReg}, {ast.num and 0xFFFFFFFF}\p" &
           &"  CMP {otherReg}, {target}\p" &
           &"  LDI?C* {target}, 1\p" &
           &"  LDI?NC* {target}, 0\p"
       of "<=": g.output &= 
-          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  LOAD {otherReg}, {ast.num and 0xFFFFFFFF}\p" &
           &"  CMP {otherReg}, {target}\p" &
           &"  LDI?C* {target}, 0\p" &
           &"  LDI?NC* {target}, 1\p"

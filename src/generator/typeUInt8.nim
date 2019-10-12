@@ -5,7 +5,7 @@ proc getOtherRegUInt8(r: Register): Register {.inline.} =
   if r == Register(1): Register(2) else: Register(1)
 
 proc loadConstUInt8(g: var Generator, r: Register, num: int64) {.inline.} =
-  g.output &= &"  LDI {r}, {num}\p"
+  g.output &= &"  LDI {r}, {num and 0xFF}\p"
 
 proc pushOnStackUInt8(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  SB (SP), {r}\p" &

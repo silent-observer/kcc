@@ -17,7 +17,7 @@ proc ltConditionInt32(): string {.inline.} = "LT"
 proc geConditionInt32(): string {.inline.} = "GE"
 
 proc loadConstInt32(g: var Generator, r: Register, num: int64) {.inline.} =
-  g.output &= &"  LOAD {r}, {num}\p"
+  g.output &= &"  LOAD {r}, {num.toSignedWord}\p"
 
 proc pushOnStackInt32(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  SW (SP), {r}\p" &
@@ -237,12 +237,12 @@ proc generateInt32(ast: BinaryRightConstExprNode, g: var Generator, target: Regi
       of "<<", ">>", "^", "|", "+", "-": discard
       of "*", "&", "&&": g.output &= &"  MOV {target}, R0\p"
       of "/": g.output &= 
-          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  LOAD {otherReg}, {ast.num.toSignedWord}\p" &
           &"  DIVS {target}, {otherReg}\p" &
            "  NOP\p".repeat(11) &
           &"  MOV {target}, LO\p"
       of "%": g.output &= 
-          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  LOAD {otherReg}, {ast.num.toSignedWord}\p" &
           &"  DIVS {target}, {otherReg}\p" &
            "  NOP\p".repeat(11) &
           &"  MOV {target}, HI\p"
@@ -283,12 +283,12 @@ proc generateInt32(ast: BinaryRightConstExprNode, g: var Generator, target: Regi
       of "+": g.output &= &"  ADDI {target}, {ast.num}\p"
       of "*": g.multiplyByConst(target, ast.num.int)
       of "/": g.output &= 
-          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  LOAD {otherReg}, {ast.num.toSignedWord}\p" &
           &"  DIVS {target}, {otherReg}\p" &
           "  NOP\p".repeat(11) &
           &"  MOV {target}, LO\p"
       of "%": g.output &= 
-          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  LOAD {otherReg}, {ast.num.toSignedWord}\p" &
           &"  DIVS {target}, {otherReg}\p" &
           "  NOP\p".repeat(11) &
           &"  MOV {target}, HI\p"
@@ -309,12 +309,12 @@ proc generateInt32(ast: BinaryRightConstExprNode, g: var Generator, target: Regi
           &"  LDI?LT* {target}, 0\p" &
           &"  LDI?GE* {target}, 1\p"
       of ">": g.output &= 
-          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  LOAD {otherReg}, {ast.num.toSignedWord}\p" &
           &"  CMP {otherReg}, {target}\p" &
           &"  LDI?LT* {target}, 1\p" &
           &"  LDI?GE* {target}, 0\p"
       of "<=": g.output &= 
-          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  LOAD {otherReg}, {ast.num.toSignedWord}\p" &
           &"  CMP {otherReg}, {target}\p" &
           &"  LDI?LT* {target}, 0\p" &
           &"  LDI?GE* {target}, 1\p"

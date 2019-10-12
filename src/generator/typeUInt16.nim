@@ -5,7 +5,7 @@ proc getOtherRegUInt16(r: Register): Register {.inline.} =
   if r == Register(1): Register(2) else: Register(1)
 
 proc loadConstUInt16(g: var Generator, r: Register, num: int64) {.inline.} =
-  g.output &= &"  LDI {r}, {num}\p"
+  g.output &= &"  LDI {r}, {num and 0xFFFF}\p"
 
 proc pushOnStackUInt16(g: var Generator, r: Register) {.inline.} =
   g.output &= &"  SH (SP), {r}\p" &
