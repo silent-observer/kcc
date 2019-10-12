@@ -1,5 +1,9 @@
 import ast
 
+const 
+  ConstHigh = 8191
+  ConstLow = -8192
+
 proc isConst(ast: AstNode): bool {.locks: 0.} =
   if ast of ConstNumberNode or ast of ConstArrayInitializerNode: return true
   if ast of ArrayInitializerNode:
@@ -34,6 +38,12 @@ method optimizeConsts(ast: UnaryExprNode): AstNode =
   result = ConstNumberNode(num: num, typeData: ast.exp.typeData)
   result.setBaseAstFields(ast)
 
+method optimizeConsts(ast: ConvertExprNode): AstNode =
+  discard procCall optimizeConsts(ast.AstNode)
+  if not (ast.exp of ConstNumberNode): return nil
+  result = ast.exp
+  result.ConstNumberNode.typeData = ast.typeData
+
 method optimizeConsts(ast: BinaryExprNode): AstNode =
   discard procCall optimizeConsts(ast.AstNode)
 
@@ -42,6 +52,11 @@ method optimizeConsts(ast: BinaryExprNode): AstNode =
 
   if not isLeftConst and isRightConst:
     let num = ast.exp2.ConstNumberNode.num
+    let numSmall = cast[int32](num and 0xFFFFFFFF)
+    let usesImmediateInstr = 
+      ast.operator in ["+", "-", "==", "!=", "<", ">=", "&", "^", "|", ">>", "<<"]
+    if usesImmediateInstr and (numSmall > ConstHigh or numSmall < ConstLow):
+      return nil
     result = BinaryRightConstExprNode(
       operator: ast.operator,
       exp1: ast.exp1, 
@@ -52,6 +67,11 @@ method optimizeConsts(ast: BinaryExprNode): AstNode =
   if isLeftConst and not isRightConst and 
       ast.operator in ["+", "*", "==", "!=", "<", ">", ">=", "<=", "&", "^", "|"]:
     let num = ast.exp1.ConstNumberNode.num
+    let numSmall = int32(num and 0xFFFFFFFF)
+    let usesImmediateInstr = ast.operator notin [">", "<="]
+    if usesImmediateInstr and (numSmall > ConstHigh or numSmall < ConstLow):
+      return nil
+    
     if ast.operator in ["+", "*", "==", "!=", "&", "^", "|"]:
       result = BinaryRightConstExprNode(
         operator: ast.operator,
