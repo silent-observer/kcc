@@ -9,7 +9,10 @@ proc test0Int32(g: var Generator, r: Register) {.inline.} =
 proc testTwoInt32(g: var Generator, r1, r2: Register) {.inline.} =
   g.output &= &"  CMP {r1}, {r2}\p"
 proc testConstInt32(g: var Generator, r1: Register, num: int64) {.inline.} =
-  g.output &= &"  CMP {r1}, {num}\p"
+  if num == 0:
+    g.output &= &"  CMP {r1}\p"
+  else:
+    g.output &= &"  CMP {r1}, {num}\p"
 proc ltConditionInt32(): string {.inline.} = "LT"
 proc geConditionInt32(): string {.inline.} = "GE"
 
@@ -225,68 +228,102 @@ proc generateInt32(ast: BinaryRightConstExprNode, g: var Generator, target: Regi
   let otherReg = target.getOtherRegInt32()
   ast.exp1.generate(g, target)
   # Operands: target <op> num
-  case ast.operator:
-    of "||": 
-      if ast.num == 0:
+  if ast.num == 0:
+    case ast.operator:
+      of "||": 
         g.output &= 
           &"  CMP {target}\p" &
           &"  LDI?NZ {target}, 1\p"
-      else:
+      of "<<", ">>", "^", "|", "+", "-": discard
+      of "*", "&", "&&": g.output &= &"  MOV {target}, R0\p"
+      of "/": g.output &= 
+          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  DIVS {target}, {otherReg}\p" &
+           "  NOP\p".repeat(11) &
+          &"  MOV {target}, LO\p"
+      of "%": g.output &= 
+          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  DIVS {target}, {otherReg}\p" &
+           "  NOP\p".repeat(11) &
+          &"  MOV {target}, HI\p"
+      of "==": g.output &= 
+          &"  CMP {target}\p" &
+          &"  LDI?Z* {target}, 1\p" &
+          &"  LDI?NZ* {target}, 0\p"
+      of "!=": g.output &= 
+          &"  CMP {target}\p" &
+          &"  LDI?Z* {target}, 0\p" &
+          &"  LDI?NZ* {target}, 1\p"
+      of "<": g.output &= 
+          &"  CMP {target}\p" &
+          &"  LDI?LT* {target}, 1\p" &
+          &"  LDI?GE* {target}, 0\p"
+      of ">=": g.output &= 
+          &"  CMP {target}\p" &
+          &"  LDI?LT* {target}, 0\p" &
+          &"  LDI?GE* {target}, 1\p"
+      of ">": g.output &= 
+          &"  CMP R0, {target}\p" &
+          &"  LDI?LT* {target}, 1\p" &
+          &"  LDI?GE* {target}, 0\p"
+      of "<=": g.output &= 
+          &"  CMP R0, {target}\p" &
+          &"  LDI?LT* {target}, 0\p" &
+          &"  LDI?GE* {target}, 1\p"
+      else: assert(false)
+  else:
+    case ast.operator:
+      of "||": 
         g.output &= &"  LDI {target}, 1\p"
-    of "&&": 
-      if ast.num != 0:
+      of "&&": 
         g.output &= 
           &"  CMP {target}\p" &
           &"  LDI?NZ {target}, 1\p"
-      else:
-        g.output &= &"  LDI {target}, 0\p"
-
-    of "-": g.output &= &"  SUBI {target}, {ast.num}\p"
-    of "+": g.output &= &"  ADDI {target}, {ast.num}\p"
-    of "*": g.multiplyByConst(target, ast.num.int)
-    of "/": g.output &= 
-        &"  LOAD {otherReg}, {ast.num}\p" &
-        &"  DIVS {target}, {otherReg}\p" &
-         "  NOP\p".repeat(11) &
-        &"  MOV {target}, LO\p"
-    of "%": g.output &= 
-        &"  LOAD {otherReg}, {ast.num}\p" &
-        &"  DIVS {target}, {otherReg}\p" &
-         "  NOP\p".repeat(11) &
-        &"  MOV {target}, HI\p"
-    of "==": 
-      g.output &= 
-        &"  CMP {target}, {ast.num}\p" &
-        &"  LDI?Z* {target}, 1\p" &
-        &"  LDI?NZ* {target}, 0\p"
-    of "!=": g.output &= 
-        &"  CMP {target}, {ast.num}\p" &
-        &"  LDI?Z* {target}, 0\p" &
-        &"  LDI?NZ* {target}, 1\p"
-    of "<": g.output &= 
-        &"  CMP {target}, {ast.num}\p" &
-        &"  LDI?LT* {target}, 1\p" &
-        &"  LDI?GE* {target}, 0\p"
-    of ">=": g.output &= 
-        &"  CMP {target}, {ast.num}\p" &
-        &"  LDI?LT* {target}, 0\p" &
-        &"  LDI?GE* {target}, 1\p"
-    of ">": g.output &= 
-        &"  LOAD {otherReg}, {ast.num}\p" &
-        &"  CMP {otherReg}, {target}\p" &
-        &"  LDI?LT* {target}, 1\p" &
-        &"  LDI?GE* {target}, 0\p"
-    of "<=": g.output &= 
-        &"  LOAD {otherReg}, {ast.num}\p" &
-        &"  CMP {otherReg}, {target}\p" &
-        &"  LDI?LT* {target}, 0\p" &
-        &"  LDI?GE* {target}, 1\p"
-    of "<<": g.output &= &"  ASHI {target}, {ast.num}\p"
-    of ">>": g.output &= &"  ASHI {target}, {-ast.num}\p"
-    of "&": g.output &= &"  ANDI {target}, {ast.num}\p"
-    of "^": g.output &= &"  XORI {target}, {ast.num}\p"
-    of "|": g.output &= &"  ORI {target}, {ast.num}\p"
-    else: assert(false)
+      of "-": g.output &= &"  SUBI {target}, {ast.num}\p"
+      of "+": g.output &= &"  ADDI {target}, {ast.num}\p"
+      of "*": g.multiplyByConst(target, ast.num.int)
+      of "/": g.output &= 
+          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  DIVS {target}, {otherReg}\p" &
+          "  NOP\p".repeat(11) &
+          &"  MOV {target}, LO\p"
+      of "%": g.output &= 
+          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  DIVS {target}, {otherReg}\p" &
+          "  NOP\p".repeat(11) &
+          &"  MOV {target}, HI\p"
+      of "==": g.output &= 
+          &"  CMP {target}, {ast.num}\p" &
+          &"  LDI?Z* {target}, 1\p" &
+          &"  LDI?NZ* {target}, 0\p"
+      of "!=": g.output &= 
+          &"  CMP {target}, {ast.num}\p" &
+          &"  LDI?Z* {target}, 0\p" &
+          &"  LDI?NZ* {target}, 1\p"
+      of "<": g.output &= 
+          &"  CMP {target}, {ast.num}\p" &
+          &"  LDI?LT* {target}, 1\p" &
+          &"  LDI?GE* {target}, 0\p"
+      of ">=": g.output &= 
+          &"  CMP {target}, {ast.num}\p" &
+          &"  LDI?LT* {target}, 0\p" &
+          &"  LDI?GE* {target}, 1\p"
+      of ">": g.output &= 
+          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  CMP {otherReg}, {target}\p" &
+          &"  LDI?LT* {target}, 1\p" &
+          &"  LDI?GE* {target}, 0\p"
+      of "<=": g.output &= 
+          &"  LOAD {otherReg}, {ast.num}\p" &
+          &"  CMP {otherReg}, {target}\p" &
+          &"  LDI?LT* {target}, 0\p" &
+          &"  LDI?GE* {target}, 1\p"
+      of "<<": g.output &= &"  ASHI {target}, {ast.num}\p"
+      of ">>": g.output &= &"  ASHI {target}, {-ast.num}\p"
+      of "&": g.output &= &"  ANDI {target}, {ast.num}\p"
+      of "^": g.output &= &"  XORI {target}, {ast.num}\p"
+      of "|": g.output &= &"  ORI {target}, {ast.num}\p"
+      else: assert(false)
 
 proc generateInt32(ast: ConvertExprNode, g: var Generator, target: Register) =
   ast.exp.generate(g, target)

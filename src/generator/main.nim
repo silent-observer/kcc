@@ -63,6 +63,12 @@ method jumpIf(ast: UnaryExprNode, g: var Generator, ifTrue, ifFalse: string) =
     ast.exp.jumpIf(g, ifFalse, ifTrue)
   else:
     procCall jumpIf(ast.ExpressionNode, g, ifTrue, ifFalse)
+method jumpIf(ast: ConvertExprNode, g: var Generator, ifTrue, ifFalse: string) =
+  if not g.shouldOptimize:
+    procCall jumpIf(ast.ExpressionNode, g, ifTrue, ifFalse)
+    return
+
+  ast.exp.jumpIf(g, ifTrue, ifFalse)
 method jumpIf(ast: BinaryExprNode, g: var Generator, ifTrue, ifFalse: string) =
   if not g.shouldOptimize:
     procCall jumpIf(ast.ExpressionNode, g, ifTrue, ifFalse)
@@ -116,11 +122,23 @@ method jumpIf(ast: BinaryExprNode, g: var Generator, ifTrue, ifFalse: string) =
           (if ifTrue == "": "" else: &"  JMP?{ast.typeData.geCondition}* {ifTrue}\p") &
           (if ifFalse == "": "" else: &"  JMP?{ast.typeData.ltCondition}* {ifFalse}\p")
   elif ast.operator == "||":
-    ast.exp1.jumpIf(g, ifTrue, "")
-    ast.exp2.jumpIf(g, ifTrue, ifFalse)
+    if ifTrue != "":
+      ast.exp1.jumpIf(g, ifTrue, "")
+      ast.exp2.jumpIf(g, ifTrue, ifFalse)
+    else:
+      let label = g.generateLabel("jumpIfOr")
+      ast.exp1.jumpIf(g, label, "")
+      ast.exp2.jumpIf(g, "", ifFalse)
+      g.output &= &"{label}:\p"
   elif ast.operator == "&&":
-    ast.exp1.jumpIf(g, "", ifFalse)
-    ast.exp2.jumpIf(g, ifTrue, ifFalse)
+    if ifFalse != "":
+      ast.exp1.jumpIf(g, "", ifFalse)
+      ast.exp2.jumpIf(g, ifTrue, ifFalse)
+    else:
+      let label = g.generateLabel("jumpIfAnd")
+      ast.exp1.jumpIf(g, "", label)
+      ast.exp2.jumpIf(g, ifTrue, "")
+      g.output &= &"{label}:\p"
   else:
     procCall jumpIf(ast.ExpressionNode, g, ifTrue, ifFalse)
 method jumpIf(ast: BinaryRightConstExprNode, g: var Generator, ifTrue, ifFalse: string) =

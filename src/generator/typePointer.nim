@@ -9,7 +9,10 @@ proc test0Pointer(g: var Generator, r: Register) {.inline.} =
 proc testTwoPointer(g: var Generator, r1, r2: Register) {.inline.} =
   g.output &= &"  CMP {r1}, {r2}\p"
 proc testConstPointer(g: var Generator, r1: Register, num: int64) {.inline.} =
-  g.output &= &"  CMP {r1}, {num}\p"
+  if num == 0:
+    g.output &= &"  CMP {r1}\p"
+  else:
+    g.output &= &"  CMP {r1}, {num}\p"
 proc ltConditionPointer(): string {.inline.} = "C"
 proc geConditionPointer(): string {.inline.} = "NC"
 
@@ -202,6 +205,7 @@ proc generatePointer(ast: BinaryRightConstExprNode, g: var Generator, target: Re
   let size = ast.typeData.ptrType[].getSize
   ast.exp1.generate(g, target)
   # Operands: target <op> num
+  if ast.num == 0: return
   case ast.operator:
     of "-": g.output &= &"  SUBI {target}, {ast.num * size}\p"
     of "+": g.output &= &"  ADDI {target}, {ast.num * size}\p"
