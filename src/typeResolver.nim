@@ -131,6 +131,7 @@ proc arithmeticCommonType(a, b: TypeData): TypeData =
   return unknownType
 
 proc isImplicitlyConvertible*(t, target: TypeData): bool =
+  if t.kind == VoidType: return false
   if areCompatible(t, target): return true
   if t.isIntegerType and target.isIntegerType: 
     return true
