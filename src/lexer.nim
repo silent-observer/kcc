@@ -183,10 +183,10 @@ proc skipWhitespaceAndComments(lexer: var Lexer) =
       lexer.pos = 1
       lexer.index += 1
       lexer.line += 1
-    elif c == '\\':
+    elif c == '/':
       lexer.advance()
       let c2 = lexer.peek()
-      if c2 == '\\':
+      if c2 == '/':
         lexer.advance()
         while true:
           let c = lexer.getOne()
@@ -202,7 +202,7 @@ proc skipWhitespaceAndComments(lexer: var Lexer) =
             lexer.pos = 1
             lexer.line += 1
           elif c == '*':
-            if lexer.peek() == '\\':
+            if lexer.peek() == '/':
               lexer.advance()
               break
       else:
